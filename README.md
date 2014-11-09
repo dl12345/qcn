@@ -56,6 +56,9 @@ Once Boost is compiled, edit the Makefile to change the paths to the libraries a
 <h3>DOWNLOAD LINKS</h3>
 
 MinGW-32 binary distribution: http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev0.7z/download
+
 MinGW-64 binary distribution: http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win64/Personal%20Builds/mingw-builds/4.9.2/threads-posix/seh/x86_64-4.9.2-release-posix-seh-rt_v3-rev0.7z/download
+
 Boost 1.57 source: http://sourceforge.net/projects/boost/files/boost/1.57.0/
+
 gmake for Windows</url>: http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev0.7z/download
