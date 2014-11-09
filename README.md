@@ -4,9 +4,7 @@ This is a utility that parses and displays differences between two text format .
 
 <h2>HOW TO USE</h2>
 
-There are pre-built binaries for 64 and 32 bit Windows as well as pre-built binaries for 32 and 64 bit Linux. The Linux binaries were built on Fedora 20 and the Windows binaries were built with MinGW and statically linked.
-
-You'll need the boost shared libraries
+There are pre-built binaries for 64 and 32 bit Windows as well as pre-built binaries for 32 and 64 bit Linux. The Linux binaries were built on Fedora 20 and the Windows binaries were built with MinGW and statically linked. For Linux you will need to install the boost shared libraries
 ````
 yum install boost
 ````
