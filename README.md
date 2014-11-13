@@ -14,20 +14,25 @@ Program usage is as follows
 ````
 Usage: qcndiff64 [options] file file
 
-  -h [ --help ]            show help message
-                           
-  -t [ --type ] arg (=p)   show differences
-                               p for items present in both files
-                               m for items missing in either file
-                               b for both present and missing items
-                           
-  -f [ --format ] arg (=i) output format
-                               i for interleaved output
-                               s for sequential output
-                               c to suppress item data and print only count
+  -h [ --help ]                 show help message
+                                
+  -t [ --type ] arg (=p)        show differences
+                                    p for items present in both files
+                                    m for items missing in either file
+                                    b for both present and missing items
+                                
+  -f [ --format ] arg (=i)      output format
+                                    i for interleaved output
+                                    s for sequential output
+                                    c to suppress item data and print only 
+                                count
+                                
+  -l [ --lookup ] arg (=nv.txt) nv item descriptions
 ````
 
-Interleaved output shows the nvitem that is different for both files before displaying the next one. Sequential output displays all the differing items in the first file before proceeding to display the second file
+Interleaved output shows the nvitem that is different for both files before displaying the next one. Sequential output displays all the differing items in the first file before proceeding to display the second file. 
+
+If the file nv.txt exists (use -l to override the name) it will be used to look up text descriptions of the codes in order to render the output more friendly.
 
 <h2>HOW TO COMPILE</h2>
 
@@ -51,7 +56,12 @@ You will need to install MinGW. You need separate toolchains for the 64 bit vers
 
 Once Boost is compiled, edit the Makefile to change the paths to the libraries and include files to conform to where you have them installed. Take note that if the default --layout==versioning option is used to compile Boost then you may also need to change the suffix option in the Makefile
 
-<h3>DOWNLOAD LINKS</h3>
+<h2>CHANGELOG<h2>
+
+0.2 - add dictionary facility to allow the lookup of text descriptions
+0.1 - initial release
+
+<h2>DOWNLOAD LINKS</h2>
 
 MinGW-32 binary distribution: http://sourceforge.net/projects/mingw-w64/files/Toolchains%20targetting%20Win32/Personal%20Builds/mingw-builds/4.9.2/threads-posix/dwarf/i686-4.9.2-release-posix-dwarf-rt_v3-rev0.7z/download
 

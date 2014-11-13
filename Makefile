@@ -35,7 +35,7 @@ else
 endif
 
 STANDARD=-std=c++11
-CPPFLAGS=-m$(ARCH) $(STANDARD) $(INCLUDE) -c
+CPPFLAGS=-m$(ARCH) $(STANDARD) $(INCLUDE) -c 
 LDFLAGS=-m$(ARCH) $(LIBPATH) $(LDOPTS)
 LIBS=-lboost_program_options$(LIBSUFFIX) -lboost_filesystem$(LIBSUFFIX) -lboost_system$(LIBSUFFIX)
 EXENAME=qcndiff
@@ -43,7 +43,7 @@ CLEANFILES=*.o $(EXENAME)$(ARCH)$(EXE)
 
 $(EXENAME)$(ARCH): qcn$(ARCH).o main$(ARCH).o
 	g++ $(LDFLAGS) -o $(EXENAME)$(ARCH) qcn$(ARCH).o main$(ARCH).o $(LIBS)
-	strip $(EXENAME)$(ARCH)$(EXT)
+#	strip $(EXENAME)$(ARCH)$(EXT)
 
 qcn$(ARCH).o: qcn.cpp qcn.hpp
 	g++ $(CPPFLAGS) -o qcn$(ARCH).o qcn.cpp

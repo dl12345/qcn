@@ -19,50 +19,70 @@ Copyright 2014 dl12345@xda-developers forum
 #ifndef QCN_H
 #define QCN_H
 
+#include <iomanip>
+#include <fstream>
+#include <iterator>
 #include <boost/config/warning_disable.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/spirit/home/classic/iterator/file_iterator.hpp>
 #include <boost/unordered_map.hpp>
-#include <boost/bind.hpp>
 #include <boost/spirit/include/phoenix.hpp>
 #include <boost/fusion/include/adapt_struct.hpp>
 #include <boost/iterator/iterator_adaptor.hpp>
-#include <iomanip>
 
 
 namespace qcn
 {
+    namespace spirit = boost::spirit;
     namespace qi = boost::spirit::qi;
     namespace ascii = boost::spirit::ascii;
     namespace fusion = boost::fusion;
     namespace range = boost::range_detail;
     namespace phx = boost::phoenix;
 
+    class Dictionary;
+    class Qcn;
+    
+    struct qitem;    
+    struct dict_code;
+    
     typedef unsigned int uint;
-
+    
     // Skipper type for parser
     typedef ascii::space_type space_type;
 
-    // Synthesized attribute types
-
-    // Vector for the parsed NV Item - itemdata attribute
-    typedef std::vector< uint > data_type;
-
-    // attribute of item, itempresent, itemnotpresent: code, status, item data
-    typedef struct qitem
+    // item grammar types
+    typedef struct qitem qcn_item_type;
+    typedef std::vector<qcn_item_type> qcn_items_type;  
+    typedef std::vector< uint > qcn_item_data_type;    
+    typedef boost::unordered_map<uint, qcn_item_type> qcn_map_type;   
+        
+    // dictionary grammar types
+    typedef struct dict_code dict_code_type;
+    typedef std::vector<dict_code_type> dict_codes_type; 
+    typedef boost::unordered_map<uint, dict_code_type> dict_map_type;
+    
+    // comparison type pairs
+    typedef std::pair<qcn_item_type, qcn_item_type> pair_type;
+    typedef std::vector<pair_type> diff_type;
+    
+    
+    struct qitem
     {
         uint code;
+        std::string description;
+        std::string category;
         std::string status;
-        data_type data;
+        qcn_item_data_type data;
 
-        qitem(): code(0), status("") {}
+        qitem(): code(0) {}
 
         qitem(struct qitem const& c)
             : code(c.code), status(c.status), data(c.data) {}
 
-        inline bool operator==(struct qitem const& rhs) const
+        bool operator==(struct qitem const& rhs) const
         {
-            if (code == 0 && status == "") // the empty object doesn't match
+            if (code == 0 && status.empty()) // the empty object doesn't match
             {
                 return false;
             }
@@ -72,9 +92,10 @@ namespace qcn
             }
             return false;
         }
-        inline bool operator!=(struct qitem const& rhs) const
+        
+        bool operator!=(struct qitem const& rhs) const
         {
-            if (code == 0 && status == "")
+            if (code == 0 && status.empty())
             {
                 return true;
             }
@@ -85,14 +106,22 @@ namespace qcn
             return false;
         }
     
-
         friend std::ostream& operator<<(std::ostream& o, struct qitem const& q)
         {
             o << std::setw(4) << std::setfill('0');
-            o << std::dec << q.code << " (0x";
-            o << std::setw(4) << std::setfill('0');
-            o << std::uppercase << std::hex << q.code;
-            o << ") - " << q.status << std::endl;
+            o << std::dec << q.code;
+            
+            if (!q.description.empty())
+            {
+                o << " (" << q.description << ", " << q.category;
+            }
+            else
+            {
+                o << " (0x";
+                o << std::setw(4) << std::setfill('0');
+                o << std::uppercase << std::hex << q.code;
+            }
+            o << ") - " << (q.status == "" ? "Missing" : q.status) << std::endl;
 
             for (auto i = 0; i < q.data.size(); i++)
             {
@@ -109,29 +138,20 @@ namespace qcn
             return o;
         }
 
-    } item_type;
-
-    // Parser output - a vector of items: code, status, item data
-    typedef std::vector<item_type> qcndata_type;    
+    };  
 
     template < typename Iterator, typename Skipper = space_type >
-    class qcnparser : public qi::grammar< Iterator, qcndata_type(), Skipper > 
+    class qcnparser : public qi::grammar< Iterator, qcn_items_type(), Skipper > 
     {        
     public:
 
-        // itemcode attribute
+        // qcn grammar types
         typedef uint code_type;
-
-        // Raw vector of byte values for the NV Item - itemleaf attribute
         typedef std::vector< uint > leaf_type;
-
-        // itemnumber and itemsize attributes
-        typedef fusion::vector2<std::string, uint> size_type;
-
-        // iteminfo attribute. Composite of itemnumber and itemsize
+        typedef fusion::vector2< std::string, uint > size_type;
         typedef fusion::vector2< size_type, size_type > info_type;
         
-        qcnparser(uint& n, uint& s) : qcnparser::base_type(qcndata)
+        qcnparser() : qcnparser::base_type(qcndata), size_(0)
         {
 
             using qi::uint_;
@@ -148,7 +168,7 @@ namespace qcn
             using qi::_1;
             using qi::attr;
             using qi::eps;
-            using phx::ref;
+            using phx::ref;           
            
             qcndata = omit[+(header)] >> *(item);
 
@@ -159,20 +179,22 @@ namespace qcn
             nvitemslabel = lit("NV items") ;
 
             iteminfo = itemnumber >> ',' >> itemsize;
+            
+            itemnumber = string("Complete items") >> '-' >> uint_;
 
             // In the presence of a semantic action the % operator is 
             // necessary to ensure the propagation of the attribute if
             // _val is not assigned explicitly
 
-            itemnumber %= (string("Complete items") >> '-' >> uint_[ref(n)=_1]);
-
-            itemsize %= (string("Items size") >> '-' >> uint_[ref(s)=_1]);        
+            itemsize %= (string("Items size") >> '-' >> uint_[ref(size_)=_1]);        
 
             item = itempresent | itemnotpresent;
 
             itempresent = itemcode >> statusok >> itemdata;
 
-            itemnotpresent = itemcode >> statusother >> attr(data_type());
+            itemnotpresent = itemcode                                
+                                >> statusother
+                                >> attr(qcn_item_data_type());
 
             itemcode = ulong_ >> omit [ itemdiscard ];
 
@@ -187,11 +209,11 @@ namespace qcn
             // Rules separated to allow for semantic action on data if desired
 
             // For example
-            // itemdata = omit[eps] >> itemleaf[_val=convert(_1, data_type())];
+            // omit[eps] >> itemleaf[_val=convert(_1, qcn_item_data_type())];
 
             itemdata = omit[eps] >> itemleaf;
-            itemleaf = repeat(ref(s))[hex];
-     
+            itemleaf = repeat(ref(size_))[hex];
+    
 #ifdef BOOST_SPIRIT_DEBUG
 
             BOOST_SPIRIT_DEBUG_NODE(qcndata);
@@ -202,7 +224,7 @@ namespace qcn
 
         }
     private:
-        qi::rule<Iterator, qcndata_type(), Skipper> qcndata; 
+        qi::rule<Iterator, qcn_items_type(), Skipper> qcndata; 
 
         qi::rule<Iterator, info_type(), Skipper>  header; 
         qi::rule<Iterator, info_type(), Skipper> description;
@@ -213,105 +235,229 @@ namespace qcn
         qi::rule<Iterator, size_type(), Skipper> itemnumber;
         qi::rule<Iterator, size_type(), Skipper> itemsize; 
 
-        qi::rule<Iterator, item_type(), Skipper> item;
-        qi::rule<Iterator, item_type(), Skipper> itempresent;
-        qi::rule<Iterator, item_type(), Skipper> itemnotpresent; 
+        qi::rule<Iterator, qcn_item_type(), Skipper> item;
+        qi::rule<Iterator, qcn_item_type(), Skipper> itempresent;
+        qi::rule<Iterator, qcn_item_type(), Skipper> itemnotpresent; 
 
         qi::rule<Iterator, std::string(), Skipper> statusok;
         qi::rule<Iterator, std::string(), Skipper> statusother;
 
         qi::rule<Iterator, code_type(), Skipper> itemcode;
         qi::rule<Iterator, Skipper> itemdiscard;
-        qi::rule<Iterator, data_type(), Skipper> itemdata;
+        qi::rule<Iterator, qcn_item_data_type(), Skipper> itemdata;
         qi::rule<Iterator, leaf_type(), Skipper> itemleaf;
+        
+        unsigned int size_;
     
+    }; 
+    
+    struct dict_code
+    {
+
+        uint code;
+        std::string description;
+        std::string category;
+          
+        friend std::ostream& operator<<(
+                std::ostream& o, 
+                struct dict_code const& c)
+        {
+            o << c.description << " - " << c.category;
+            return o;
+        }
+
     };
 
-    class Qcn
+    template < typename Iterator, typename Skipper = space_type >
+    class codeparser : public qi::grammar<Iterator, dict_codes_type(), Skipper>
+    {        
+    public:
+                    
+        codeparser() : codeparser::base_type(codes)
+        {
+
+            using qi::uint_;
+            using qi::char_;
+            using qi::string;
+            using qi::lit;
+            using qi::eol;
+            using qi::omit;
+            using qi::no_skip;
+            using qi::_a;
+           
+            codes = *(uint_ >> sep >> description >> sep >> category);
+                
+            sep = omit[ char_("^") ];
+                
+            description =  
+                   omit[char_("\"") ]             
+                >> no_skip[+(char_ - char_("\""))]
+                >> omit[char_("\"")]           
+            ;
+
+            category = 
+                   omit[ char_("'\"") ]             
+                >> no_skip[+(char_ - char_("*\""))]    
+                >> no_skip[ omit[ *(char_ - eol) ] >> eol]
+            ;
+                
+#ifdef BOOST_SPIRIT_DEBUG
+                
+            BOOST_SPIRIT_DEBUG_NODE(codes);
+            BOOST_SPIRIT_DEBUG_NODE(description);
+            BOOST_SPIRIT_DEBUG_NODE(category);
+            BOOST_SPIRIT_DEBUG_NODE(sep);
+                
+#endif
+                
+        }
+    private:
+        qi::rule<Iterator, dict_codes_type(), Skipper> codes; 
+        qi::rule<Iterator, Skipper> sep;
+        qi::rule<Iterator, std::string(), Skipper> description;
+        qi::rule<Iterator, std::string(), Skipper> category;
+    };            
+    
+    template <
+                typename T_data_type, 
+                typename T_item_type,
+                typename T_map_type, 
+                typename T_parser_type
+            >
+    class DataFile
     {
     public:
+    
+        typedef typename T_data_type::iterator d_iterator;
+        typedef typename T_map_type::iterator m_iterator;
+        typedef typename T_map_type::const_iterator m_const_iterator;
+        
+        DataFile(std::string const& filename)
+            :   filename_(filename), 
+                err_(""),
+                success_(false)
+        {
+        }
 
-        // hash table of items
-        typedef boost::unordered_map<uint, item_type> map_type;
-        typedef item_type item;        
+        DataFile(DataFile const& rhs)
+            :   filename_(rhs.filename_), 
+                err_(rhs.err_),
+                success_(rhs.success_),
+                map_(rhs.map_)  
+        {
+        }
+ 
+        ~DataFile() {}
+         
+        bool const Open()
+        {
+            using spirit::ascii::space;    
+            using qi::eoi;
+            using qi::blank;
+   
+            std::ifstream in(filename_);  
+            if (!in.is_open()) 
+            {
+                err_ = "Could not open input file";
+                success_ = false;
+                return success_;
+            }
+            in.unsetf(std::ios::skipws);
 
-        typedef map_type::iterator map_iterator; 
-        typedef map_type::const_iterator map_const_iterator;
+            typedef spirit::istream_iterator iterator_type;
+            
+            iterator_type begin(in);
+            iterator_type end;
 
-        typedef enum {present, missing, both} cmp;
+            if (begin == end)
+            {
+                err_ = "Empty input file";
+                success_ = false;
+                return success_;
+            }
 
-        Qcn(std::string const& filename);
-        Qcn(Qcn const& rhs);
-        ~Qcn();
+            T_parser_type p;   
+            bool r = phrase_parse(begin, end, p >> eoi, space, data_);    
 
-        bool const Open();
+            if (r && begin == end)
+            {
+                MakeHashTable();
+                success_ = true;            
+                return success_;
+            }
+            else
+            {
+                err_ = "Invalid format input file";
+                success_ = false;
+                return success_;
+            } 
+            return false;
+        }
+    
         bool const IsOpen() const { return success_; }
-        uint const Size() const;
+        uint const Size() const { return map_.size(); }
         std::string const& ErrorMessage() { return err_; }
-
-        item_type& operator[](uint const& key); 
-        friend std::ostream& operator<<(std::ostream& o, Qcn const& q);
-
+        
     public:
 
         class iterator 
             : public boost::iterator_adaptor<
-                iterator, 
-                map_iterator,
-                item_type&,
-                boost::forward_traversal_tag
-              >
+                                                iterator, 
+                                                m_iterator,
+                                                T_item_type&,
+                                                boost::forward_traversal_tag
+                                            >
         {
         public:
             iterator(): iterator::iterator_adaptor_() {}
 
-            iterator(const map_iterator& i) : iterator::iterator_adaptor_(i){}
+            iterator(const m_iterator& i) : iterator::iterator_adaptor_(i){}
 
-            item_type& dereference() const
+            T_item_type& dereference() const
             {
-                return base()->second;
+                return this->base()->second;
             }
-            item_type* reference() const
+            
+            T_item_type* reference() const
             {
-                return &(base()->second);
+                return &(this->base()->second);
             }
        
         private:
             friend class boost::iterator_core_access;
-        };
+        };    
 
         class const_iterator 
             : public boost::iterator_adaptor<
-                const_iterator,
-                map_const_iterator,
-                item_type const&,
-                boost::forward_traversal_tag
-            >
+                                                const_iterator,
+                                                m_const_iterator,
+                                                T_item_type const&,
+                                                boost::forward_traversal_tag
+                                            >
         {
         public:
 
             const_iterator(): const_iterator::iterator_adaptor_() {}
 
-            const_iterator(const map_const_iterator& i)
+            const_iterator(const m_const_iterator& i)
                 : const_iterator::iterator_adaptor_(i) {}
 
             const_iterator(const iterator& i)
                 : const_iterator::iterator_adaptor_(i.base()) {}
 
-            item_type const& dereference() const
+            T_item_type const& dereference() const
             {
-                return (item_type const&) base()->second;
+                return (T_item_type const&) this->base()->second;
             }
 
-            item_type const* reference() const
+            T_item_type const* reference() const
             {
-                return (item_type const *) &(base()->second);
+                return (T_item_type const *) &(this->base()->second);
             }
 
         private:
             friend class boost::iterator_core_access;
         };
-
 
         iterator begin()
         {
@@ -333,29 +479,83 @@ namespace qcn
             return const_iterator(map_.end());
         }
 
-        iterator Find(uint const& key);        
-        const_iterator Find(uint const& key) const;
-     
-    private:
-        void MakeHashTable();
+        iterator Find(uint const& key) { return map_.find(key); }
+        const_iterator Find(uint const& key) const { return map_.find(key); }
 
+
+    private:
+    
+        virtual typename T_map_type::key_type const Key(d_iterator const& i)=0;
+          
+        void MakeHashTable()
+        {
+            for (auto i = data_.begin(); i != data_.end(); ++i)
+            {
+                map_[Key(i)] = *i;
+            }
+            data_.clear();
+        }
+            
         std::string filename_;
         std::string err_;
-        qcndata_type data_;
-        map_type map_;
-        uint items_, size_;
         bool success_;
+        T_data_type data_;
+        T_map_type map_;
     };
+                      
+    class Dictionary: public DataFile   < 
+                                            dict_codes_type, 
+                                            dict_code_type,
+                                            dict_map_type, 
+                                            codeparser<spirit::istream_iterator> 
+                                        > 
+    {
+    public:
+    
+        Dictionary(std::string const& filename) : DataFile(filename) {}
+        Dictionary(Dictionary const& rhs) : DataFile(rhs) {}
+          
+          
+    private:
+    
+        typename dict_map_type::key_type const Key(d_iterator const& i)
+        {
+            return i->code;
+        }
+        
+    };
+    
+    class Qcn: public DataFile  < 
+                                    qcn_items_type, 
+                                    qcn_item_type,
+                                    qcn_map_type, 
+                                    qcnparser< spirit::istream_iterator > 
+                                > 
+    {
+    public:
+    
+        typedef qcn_item_type item;     
+        typedef enum {present, missing, both} cmp;
+            
+        Qcn(std::string const& filename) : DataFile(filename) {}
+        Qcn(Qcn const& rhs) : DataFile(rhs) {}
+                  
+    private:     
+     
+        typename qcn_map_type::key_type const Key(d_iterator const& i)
+        {
+            return i->code;
+        }
 
-    typedef std::pair<Qcn::item, Qcn::item> pair_type;
-    typedef std::vector<pair_type> diff_type;
+    };
+    
+    diff_type const Compare (
+                                Qcn const& lhs, 
+                                Qcn const& rhs, 
+                                Qcn::cmp const cmp = Qcn::cmp::both,        
+                                bool const recurse = true
+                            );
 
-    diff_type const Compare(
-        Qcn const& lhs, 
-        Qcn const& rhs, 
-        Qcn::cmp const cmp = Qcn::cmp::both,
-        bool const recurse = true
-    );
 }
 
 BOOST_FUSION_ADAPT_STRUCT(
@@ -363,6 +563,13 @@ BOOST_FUSION_ADAPT_STRUCT(
     (qcn::uint, code)
     (std::string, status)
     (std::vector<qcn::uint>, data)
+)
+
+BOOST_FUSION_ADAPT_STRUCT(
+    qcn::dict_code,
+    (qcn::uint, code)
+    (std::string, description)
+    (std::string, category)
 )
 
 #endif

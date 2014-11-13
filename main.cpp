@@ -17,6 +17,7 @@ Copyright 2014 dl12345@xda-developers forum
 */
 
 #include <string>
+#include <iostream>
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/cmdline.hpp>
 #include <boost/program_options/parsers.hpp>
@@ -34,7 +35,8 @@ bool const ProcessCommandLine(
     Qcn::cmp& cmp,
     printformat& format, 
     std::string& fileone,
-    std::string& filetwo
+    std::string& filetwo,
+    std::string& filedict
 )
 {
     namespace po = boost::program_options;
@@ -59,6 +61,8 @@ bool const ProcessCommandLine(
                         "    i for interleaved output\n"
                         "    s for sequential output\n"
                         "    c to suppress item data and print only count\n")
+        ("lookup,l", po::value<std::string>(&filedict)->default_value("nv.txt"),
+                        "nv item descriptions")
     ;
 
     po::options_description hidden("hidden options");
@@ -160,12 +164,17 @@ void PrintOutput(
     qcn::diff_type const& d, 
     std::string const& fileone,
     std::string const& filetwo,
+    std::string const& filedict,
     printformat p = interleave
 )
 {
     std::cout << std::endl;
     std::cout << "Found " << d.size() << " non matching items";
     std::cout << std::endl << std::endl;
+    
+    qcn::Dictionary dict(filedict);
+    bool printinfo = false;      
+    if (dict.Open()) printinfo = true;
 
     switch(p)
     {
@@ -174,6 +183,22 @@ void PrintOutput(
             for (auto i = d.begin(); i != d.end(); ++i)
             {
                 auto p = *i;
+                
+                if (printinfo) 
+                {
+                    auto j = dict.Find(p.first.code);                    
+                    
+                    if (j != dict.end())
+                    {
+                        auto q = *j;
+                        
+                        p.first.description = q.description;
+                        p.second.description = q.description;
+                        
+                        p.first.category = q.category;
+                        p.second.category = q.category;
+                    }
+                }
 
                 std::cout << '[' << fileone << "]: ";
                 std::cout << p.first << std::endl;
@@ -208,19 +233,20 @@ void PrintOutput(
 int main(int argc, char *argv[])
 {
     Qcn::cmp cmp;
-    std::string nameone, nametwo;
+    std::string nameone, nametwo, nameinfo;
     printformat pf;
-
-    if (ProcessCommandLine(argc, argv, cmp, pf, nameone, nametwo))
+    
+    if (ProcessCommandLine(argc, argv, cmp, pf, nameone, nametwo, nameinfo))
     {
-        qcn::Qcn fileone(nameone), filetwo(nametwo);
+        qcn::Qcn fileone(nameone), filetwo(nametwo);        
         auto n1 = fs::path(nameone).filename().string();
         auto n2 = fs::path(nametwo).filename().string();
 
         if (fileone.Open() && filetwo.Open())
         {
+            
             auto d = qcn::Compare(fileone, filetwo, cmp);
-            PrintOutput(d, n1, n2, pf);    
+            PrintOutput(d, n1, n2, nameinfo, pf);    
         }
         else 
         {

@@ -20,127 +20,15 @@ Copyright 2014 dl12345@xda-developers forum
 #define BOOST_SPIRIT_DEBUG
 #endif
 
-#include <iostream>
-#include <fstream>
 #include <string>
 #include "qcn.hpp"
 
 namespace qcn
-{
-    Qcn::Qcn(std::string const& filename)
-        :   filename_(filename), 
-            items_(0), 
-            size_(0), 
-            err_(""),
-            success_(false)
-    {
-    }
-
-    Qcn::Qcn(Qcn const& rhs)
-        :   filename_(rhs.filename_), 
-            items_(rhs.items_), 
-            size_(rhs.size_), 
-            err_(rhs.err_),
-            success_(rhs.success_),
-            map_(rhs.map_)
-    {
-    }
-
-    bool const Qcn::Open()
-    {
-        using boost::spirit::ascii::space;    
-        using boost::spirit::qi::eoi;
-        using boost::spirit::qi::blank;
-
-        typedef boost::spirit::istream_iterator iterator_type;    
-        typedef qcnparser< iterator_type > parser;
-   
-        std::ifstream in(filename_);  
-        if (!in.is_open()) 
-        {
-            err_ = "Could not open input file";
-            success_ = false;
-            return success_;
-        }
-        in.unsetf(std::ios::skipws);
-
-        iterator_type begin(in);
-        iterator_type end;
-
-        if (begin == end)
-        {
-            err_ = "Empty input file";
-            success_ = false;
-            return success_;
-        }
-
-        unsigned n = 0, s = 0;
-        parser qcn(n, s); 
-    
-        bool r = phrase_parse(begin, end, qcn >> eoi, space, data_);   
-
-        if (r && begin == end)
-        {
-            MakeHashTable();
-            success_ = true;            
-            return success_;
-        }
-        else
-        {
-            err_ = "Invalid format input file";
-            success_ = false;
-            return success_;
-        } 
-    }
-
-    void Qcn::MakeHashTable()
-    {
-        for (auto i = data_.begin(); i != data_.end(); ++i)
-        {
-            map_[(*i).code] = *i;
-        }
-        data_.clear();
-    }
-
-    std::ostream& operator<<(std::ostream& o, Qcn const& q)
-    {
-        for (auto i = q.map_.begin(); i != q.map_.end(); ++i)
-        {
-            o << i->second << " \n";
-        }
-        return o;
-    }
-
-    uint const Qcn::Size() const
-    {
-        return map_.size();
-    }
-
-    Qcn::iterator Qcn::Find(uint const& key)
-    {
-        auto i = map_.find(key);
-        return i;
-    }
-
-    Qcn::const_iterator Qcn::Find(uint const& key) const
-    {
-        auto i = map_.find(key);
-        return i;
-    }
-
-    item_type& Qcn::operator[](uint const& key)
-    {
-        return map_[key];
-    }
-
-    Qcn::~Qcn()
-    {
-    }
-
+{   
     diff_type const Compare(
         Qcn const& lhs, 
         Qcn const& rhs, 
-        Qcn::cmp const cmp,
+        Qcn::cmp const cmp,        
         bool const recurse
     )
     {
