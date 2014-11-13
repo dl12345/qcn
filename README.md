@@ -58,8 +58,8 @@ Once Boost is compiled, edit the Makefile to change the paths to the libraries a
 
 <h2>CHANGELOG</h2>
 
-0.2 - add dictionary facility to allow the lookup of text descriptions
-0.1 - initial release
+* 0.2 - add dictionary facility to allow the lookup of text descriptions
+* 0.1 - initial release
 
 <h2>DOWNLOAD LINKS</h2>
 
