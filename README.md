@@ -56,7 +56,7 @@ You will need to install MinGW. You need separate toolchains for the 64 bit vers
 
 Once Boost is compiled, edit the Makefile to change the paths to the libraries and include files to conform to where you have them installed. Take note that if the default --layout==versioning option is used to compile Boost then you may also need to change the suffix option in the Makefile
 
-<h2>CHANGELOG<h2>
+<h2>CHANGELOG</h2>
 
 0.2 - add dictionary facility to allow the lookup of text descriptions
 0.1 - initial release
